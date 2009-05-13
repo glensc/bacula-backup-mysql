@@ -6,8 +6,8 @@ use DBI;
 use File::Temp qw(tempdir);
 use File::Path qw(rmtree);
 
-# path to ini-style config
-my $config = '/etc/bacula/backup-mysql.apache';
+# path to Apache HTTPd-style config
+my $config = '/etc/bacula/backup-mysql.conf';
 my $c = new BBM::Config($config);
 
 # how change to user mysql after we've read config
