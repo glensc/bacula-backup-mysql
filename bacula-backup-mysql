@@ -1,0 +1,120 @@
+#!/usr/bin/perl -w
+use strict;
+use POSIX qw(setuid setgid);
+
+use DBI;
+use File::Temp qw(tempdir);
+use File::Path qw(rmtree);
+use delfi::mycnf;
+
+# path to ini-style config
+my $config = '/etc/bacula/backup-mysql.conf';
+my $c = new delfi::mycnf($config);
+# force reading config file before we switch user
+$c->get("");
+
+# how change to user mysql after we've read config
+unless ($<) {
+	my $uid = getpwnam('mysql');
+	my $gid = getgrnam('mysql');
+	die "Can't find user/group mysql\n" unless $uid or $gid;
+
+	$) = "$gid $gid";
+   	$( = $gid;
+   	$> = $< = $uid;
+}
+
+# setup tmpdir
+my $backup_dir = $c->get('options', 'outdir') or die "'outdir' not defined in config\n";
+my $tmpdir = $c->get('options', 'tmpdir')  or die "'tmpdir' not defined in config\n";
+
+if (!-d $backup_dir && !mkdir($backup_dir) && !-d $backup_dir) {
+	die "backup dir '$backup_dir' not present and can't be created\n";
+}
+if (!-d $tmpdir && !mkdir($tmpdir) && !-d $tmpdir) {
+	die "tmpdir '$tmpdir' not present and can't be created\n";
+}
+
+# process each cluster
+for my $cluster ($c->get('clusters', 'cluster')) {
+	print ">>> $cluster\n";
+	backup_cluster($cluster);
+	print "<<< $cluster\n";
+}
+
+# 
+# Usage: mysqlhotcopy $CLUSTER $DATABASE $USERNAME $PASSWORD $SOCKET
+#
+sub mysqlhotcopy {
+	my ($cluster, $database, $user, $password, $socket) = @_;
+
+	my $dstdir = tempdir("bbm.XXXXXX", DIR => $tmpdir);
+
+	# make backup with mysqlhotcopy
+	my @shell = ('mysqlhotcopy');
+	push(@shell, '-u', $user) if $user;
+	push(@shell, '-p', $password) if $password;
+	push(@shell, '-S', $socket) if $socket;
+	push(@shell, $database, $dstdir);
+	system(@shell) == 0 or die "mysqlhotcopy failed: $?\n";
+
+	# put it to "production dir"
+	my $cluster_dir = "$backup_dir/$cluster";
+	if (!-d $cluster_dir && !mkdir($cluster_dir) && !-d $cluster_dir) {
+		die "cluster dir '$cluster_dir' not present and can't be created\n";
+	}
+
+	my $dirname = "$backup_dir/$cluster/$database";
+	if (-d $dirname) {
+		rmtree($dirname);
+	}
+
+	my $srcdir= "$dstdir/$database";
+	rename($srcdir, $dirname) or die "Rename '$srcdir'->'$dirname' failed: $!\n";
+
+	rmdir($dstdir) or warn $!;
+}
+
+sub backup_cluster {
+	my ($cluster) = @_;
+
+	# get db connection info
+	my $user = $c->get($cluster, 'user') || $c->get('client', 'user');
+	my $password = $c->get($cluster, 'password') || $c->get('client', 'password');
+	my $socket = $c->get($cluster, 'socket') || $c->get('client', 'socket');
+
+	# get databases to backup
+	my @dbs;
+
+	my @include = $c->get($cluster, 'include_databases');
+	my @exclude = $c->get($cluster, 'exclude_databases');
+	if (@exclude or !@include) {
+		my $dbh = new DB($user, $password, $socket);
+		my $sth = $dbh->prepare("show databases");
+		$sth->execute();
+		while (my($dbname) = $sth->fetchrow_array) {
+			next if lc($dbname) eq 'information_schema';
+			push @dbs, $dbname unless grep { m{^\Q$dbname\E$} } @exclude;
+		}
+		undef $dbh;
+	}
+
+	# now do the backup
+	foreach my $db (@dbs) {
+		mysqlhotcopy($cluster, $db, $user, $password, $socket);
+	}
+}
+
+package DB;
+
+# DB class for simple Database connection
+sub new {
+	my $self = shift;
+	my $class = ref($self) || $self;
+
+	my ($user, $password, $socket) = @_;
+	my $dsn = '';
+	$dsn .= "mysql_socket=$socket" if $socket;
+	my $dbh = DBI->connect("DBI:mysql:$dsn", $user, $password, { PrintError => 0, RaiseError => 1 });
+	return $dbh;
+}
