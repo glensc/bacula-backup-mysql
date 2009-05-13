@@ -1,17 +1,14 @@
 #!/usr/bin/perl -w
+package BBM;
 use strict;
 use POSIX qw(setuid setgid);
-
 use DBI;
 use File::Temp qw(tempdir);
 use File::Path qw(rmtree);
-use delfi::mycnf;
 
 # path to ini-style config
-my $config = '/etc/bacula/backup-mysql.conf';
-my $c = new delfi::mycnf($config);
-# force reading config file before we switch user
-$c->get("");
+my $config = '/etc/bacula/backup-mysql.apache';
+my $c = new BBM::Config($config);
 
 # how change to user mysql after we've read config
 unless ($<) {
@@ -84,28 +81,33 @@ sub backup_cluster {
 	my $socket = $c->get($cluster, 'socket') || $c->get('client', 'socket');
 
 	# get databases to backup
-	my @dbs;
+	my @include = $c->get($cluster, 'include_database');
+	my @exclude = $c->get($cluster, 'exclude_database');
 
-	my @include = $c->get($cluster, 'include_databases');
-	my @exclude = $c->get($cluster, 'exclude_databases');
+	# start with include list
+	my %dbs = map { $_ => 1 } @include;
 	if (@exclude or !@include) {
-		my $dbh = new DB($user, $password, $socket);
+		my $dbh = new BBM::DB($user, $password, $socket);
 		my $sth = $dbh->prepare("show databases");
 		$sth->execute();
 		while (my($dbname) = $sth->fetchrow_array) {
 			next if lc($dbname) eq 'information_schema';
-			push @dbs, $dbname unless grep { m{^\Q$dbname\E$} } @exclude;
+			$dbs{$dbname} = 1;
 		}
 		undef $dbh;
 	}
 
+	# remove excluded databases
+	delete @dbs{@exclude};
+
 	# now do the backup
-	foreach my $db (@dbs) {
+	foreach my $db (keys %dbs) {
 		mysqlhotcopy($cluster, $db, $user, $password, $socket);
 	}
 }
 
-package DB;
+package BBM::DB;
+use strict;
 
 # DB class for simple Database connection
 sub new {
@@ -117,4 +119,33 @@ sub new {
 	$dsn .= "mysql_socket=$socket" if $socket;
 	my $dbh = DBI->connect("DBI:mysql:$dsn", $user, $password, { PrintError => 0, RaiseError => 1 });
 	return $dbh;
+}
+
+package BBM::Config;
+use strict;
+use Config::General;
+
+sub new {
+	my $self = shift;
+	my $class = ref($self) || $self;
+	my $file = shift;
+
+	my $config = new Config::General(-ConfigFile => $file, -LowerCaseNames => 1);
+	my $this = { $config->getall() };
+	bless($this, $class);
+}
+
+sub get {
+	my ($self, $section, $key) = @_;
+	my $h = $self;
+
+	# descend to [cluster] if $section not present in root tree
+	unless (exists $h->{$section}) {
+		$h = $h->{cluster};
+	}
+
+	# pay attention if callee wanted arrays
+	return wantarray ? () : undef unless exists $h->{$section};
+	return wantarray ? () : undef unless exists $h->{$section}->{$key};
+	return $h->{$section}->{$key};
 }
