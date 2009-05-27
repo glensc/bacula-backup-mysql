@@ -45,6 +45,8 @@ for my $cluster ($c->get('clusters', 'cluster')) {
 sub mysqlhotcopy {
 	my ($cluster, $database, $user, $password, $socket) = @_;
 
+	print ">>>> mysqlhotcopy $database\n";
+
 	my $dstdir = tempdir("bbm.XXXXXX", DIR => $tmpdir);
 
 	# make backup with mysqlhotcopy
@@ -70,6 +72,8 @@ sub mysqlhotcopy {
 	rename($srcdir, $dirname) or die "Rename '$srcdir'->'$dirname' failed: $!\n";
 
 	rmdir($dstdir) or warn $!;
+
+	print "<<<< mysqlhotcopy $database\n";
 }
 
 sub backup_cluster {
@@ -86,6 +90,7 @@ sub backup_cluster {
 
 	# start with include list
 	my %dbs = map { $_ => 1 } @include;
+
 	if (@exclude or !@include) {
 		my $dbh = new BBM::DB($user, $password, $socket);
 		my $sth = $dbh->prepare("show databases");
@@ -147,5 +152,9 @@ sub get {
 	# pay attention if callee wanted arrays
 	return wantarray ? () : undef unless exists $h->{$section};
 	return wantarray ? () : undef unless exists $h->{$section}->{$key};
+
+	# deref if wanted array and is arrayref
+	return @{$h->{$section}->{$key}} if wantarray && ref $h->{$section}->{$key} eq 'ARRAY';
+
 	return $h->{$section}->{$key};
 }
