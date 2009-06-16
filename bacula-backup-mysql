@@ -1,10 +1,14 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -ws
+# Rudimentary switch parsing. Must be in main package.
+our $cleanup;
+
 package BBM;
 use strict;
 use POSIX qw(setuid setgid);
 use DBI;
 use File::Temp qw(tempdir);
 use File::Path qw(rmtree);
+
 
 # path to Apache HTTPd-style config
 my $config = '/etc/bacula/backup-mysql.conf';
@@ -15,6 +19,9 @@ unless ($<) {
 	my $uid = getpwnam('mysql');
 	my $gid = getgrnam('mysql');
 	die "Can't find user/group mysql\n" unless $uid or $gid;
+
+	# CWD could not be accessible for mysql user
+	chdir("/");
 
 	$) = "$gid $gid";
    	$( = $gid;
@@ -35,7 +42,11 @@ if (!-d $tmpdir && !mkdir($tmpdir) && !-d $tmpdir) {
 # process each cluster
 for my $cluster ($c->get('clusters', 'cluster')) {
 	print ">>> $cluster\n";
-	backup_cluster($cluster);
+	if ($cleanup) {
+		cleanup_cluster($cluster);
+	} else {
+		backup_cluster($cluster);
+	}
 	print "<<< $cluster\n";
 }
 
@@ -74,6 +85,14 @@ sub mysqlhotcopy {
 	rmdir($dstdir) or warn $!;
 
 	print "<<<< mysqlhotcopy $database\n";
+}
+
+sub cleanup_cluster {
+	my ($cluster) = @_;
+	my $cluster_dir = "$backup_dir/$cluster";
+	print ">>>> cleanup $cluster_dir\n";
+	rmtree($cluster_dir);
+	print "<<<< cleanup $cluster_dir\n";
 }
 
 sub backup_cluster {
