@@ -14,7 +14,7 @@ use File::Path qw(rmtree);
 my $config = '/etc/bacula/backup-mysql.conf';
 my $c = new BBM::Config($config);
 
-# how change to user mysql after we've read config
+# now change to user mysql after we've read config
 unless ($<) {
 	my $uid = getpwnam('mysql');
 	my $gid = getgrnam('mysql');
