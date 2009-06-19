@@ -2,7 +2,7 @@
 Summary:	MySQL backup hook for Bacula
 Name:		bacula-backup-mysql
 Version:	0.2
-Release:	0.7
+Release:	0.8
 License:	GPL v2
 Group:		Applications/Databases
 Source0:	%{name}
@@ -14,7 +14,7 @@ Requires:	perl-DBD-mysql
 BuildArch:	noarch
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
-%define		_sysconfdir	/etc/%{name}
+%define		_sysconfdir	/etc/bacula
 
 %description
 Bacula - It comes by night and sucks the vital essence from your
