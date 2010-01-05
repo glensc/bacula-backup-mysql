@@ -1,4 +1,21 @@
 #!/usr/bin/perl -ws
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to:
+#
+#  Free Software Foundation, Inc.
+#  59 Temple Place - Suite 330
+#  Boston, MA 02111-1307, USA.
+
 # Rudimentary switch parsing. Must be in main package.
 our $cleanup;
 
@@ -50,7 +67,7 @@ for my $cluster ($c->get('clusters', 'cluster')) {
 	print "<<< $cluster\n";
 }
 
-# 
+#
 # Usage: mysqlhotcopy $CLUSTER $DATABASE $USERNAME $PASSWORD $SOCKET
 #
 sub mysqlhotcopy {
@@ -177,3 +194,35 @@ sub get {
 
 	return $h->{$section}->{$key};
 }
+
+
+__END__
+
+=head1 NAME
+
+bacula-backup-mysql - A hook for Bacula to backup mysql databases using mysqlhotcopy.
+
+=head1 SYNOPSIS
+
+  Job {
+    Name = "example.org-mysql"
+    ...
+     # This prepares the backup
+    Client Run Before Job = "/usr/sbin/bacula-backup-mysql"
+    # This deletes the copy of the catalog
+    Client Run After Job = "/usr/sbin/bacula-backup-mysql -cleanup"
+  }
+
+=head1 DESCRIPTION
+
+This is a script to be setup as C<Client Run Before Job> in Bacula.
+
+=head1 AUTHOR
+
+Copyright (C) 2009-2010, Elan Ruusamäe <glen@delfi.ee>
+
+=head1 SEE ALSO
+
+http://www.bacula.org/
+
+=cut
