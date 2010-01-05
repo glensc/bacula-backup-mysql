@@ -2,7 +2,7 @@
 Summary:	MySQL backup hook for Bacula
 Name:		bacula-backup-mysql
 Version:	0.2
-Release:	0.8
+Release:	1
 License:	GPL v2
 Group:		Applications/Databases
 Source0:	%{name}
@@ -24,13 +24,13 @@ This package contains MySQL backup hook.
 
 %prep
 %setup -qcT
-cp %{SOURCE0} .
-cp %{SOURCE1} .
+cp -a %{SOURCE0} .
+cp -a %{SOURCE1} .
 
 %install
 rm -rf $RPM_BUILD_ROOT
 install -d $RPM_BUILD_ROOT{%{_sbindir},%{_sysconfdir}}
-install %{name} $RPM_BUILD_ROOT%{_sbindir}
+install -p %{name} $RPM_BUILD_ROOT%{_sbindir}
 cp -a %{name}.conf $RPM_BUILD_ROOT%{_sysconfdir}/backup-mysql.conf
 
 %clean
