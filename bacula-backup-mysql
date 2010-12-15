@@ -207,7 +207,7 @@ bacula-backup-mysql - A hook for Bacula to backup mysql databases using mysqlhot
   Job {
     Name = "example.org-mysql"
     ...
-     # This prepares the backup
+    # This prepares the backup
     Client Run Before Job = "/usr/sbin/bacula-backup-mysql"
     # This deletes the copy of the catalog
     Client Run After Job = "/usr/sbin/bacula-backup-mysql -cleanup"
@@ -219,7 +219,7 @@ This is a script to be setup as C<Client Run Before Job> in Bacula.
 
 =head1 AUTHOR
 
-Copyright (C) 2009-2010, Elan Ruusamäe <glen@delfi.ee>
+Copyright (C) 2009-2010, Elan RuusamE<auml>e <glen@delfi.ee>
 
 =head1 SEE ALSO
 
