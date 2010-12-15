@@ -88,6 +88,7 @@ sub mysqlhotcopy {
 	# put it to "production dir"
 	my $cluster_dir = "$backup_dir/$cluster";
 	if (!-d $cluster_dir && !mkdir($cluster_dir) && !-d $cluster_dir) {
+		rmtree($dstdir);
 		die "cluster dir '$cluster_dir' not present and can't be created\n";
 	}
 
@@ -96,8 +97,11 @@ sub mysqlhotcopy {
 		rmtree($dirname);
 	}
 
-	my $srcdir= "$dstdir/$database";
-	rename($srcdir, $dirname) or die "Rename '$srcdir'->'$dirname' failed: $!\n";
+	my $srcdir = "$dstdir/$database";
+	unless (rename($srcdir, $dirname)) {
+		rmtree($dstdir);
+		die "Rename '$srcdir'->'$dirname' failed: $!\n";
+	}
 
 	rmdir($dstdir) or warn $!;
 
