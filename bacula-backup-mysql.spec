@@ -2,7 +2,7 @@
 Summary:	MySQL backup hook for Bacula
 Name:		bacula-backup-mysql
 Version:	0.3
-Release:	3
+Release:	4
 License:	GPL v2
 Group:		Applications/Databases
 Source0:	%{name}

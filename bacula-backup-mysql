@@ -99,8 +99,9 @@ sub mysqlhotcopy {
 
 	my $srcdir = "$dstdir/$database";
 	unless (rename($srcdir, $dirname)) {
+		my $err = $!;
 		rmtree($dstdir);
-		die "Rename '$srcdir'->'$dirname' failed: $!\n";
+		die "Rename '$srcdir'->'$dirname' failed: $err\n";
 	}
 
 	rmdir($dstdir) or warn $!;
