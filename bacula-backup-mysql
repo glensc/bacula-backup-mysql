@@ -158,9 +158,6 @@ use strict;
 
 # DB class for simple Database connection
 sub new {
-	my $self = shift;
-	my $class = ref($self) || $self;
-
 	my ($user, $password, $socket) = @_;
 	my $dsn = '';
 	$dsn .= "mysql_socket=$socket" if $socket;
