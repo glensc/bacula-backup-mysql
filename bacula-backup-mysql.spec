@@ -1,8 +1,8 @@
 %include	/usr/lib/rpm/macros.perl
 Summary:	MySQL backup hook for Bacula
 Name:		bacula-backup-mysql
-Version:	0.3
-Release:	4
+Version:	0.4
+Release:	1
 License:	GPL v2
 Group:		Applications/Databases
 Source0:	%{name}
@@ -35,8 +35,8 @@ pod2man bacula-backup-mysql -o bacula-backup-mysql.1
 rm -rf $RPM_BUILD_ROOT
 install -d $RPM_BUILD_ROOT{%{_sbindir},%{_sysconfdir},%{_mandir}/man1}
 install -p %{name} $RPM_BUILD_ROOT%{_sbindir}
-cp -a %{name}.conf $RPM_BUILD_ROOT%{_sysconfdir}/backup-mysql.conf
-cp -a bacula-backup-mysql.1 $RPM_BUILD_ROOT%{_mandir}/man1
+cp -p %{name}.conf $RPM_BUILD_ROOT%{_sysconfdir}/backup-mysql.conf
+cp -p bacula-backup-mysql.1 $RPM_BUILD_ROOT%{_mandir}/man1
 
 %clean
 rm -rf $RPM_BUILD_ROOT
