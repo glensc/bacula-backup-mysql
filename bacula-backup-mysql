@@ -221,9 +221,52 @@ bacula-backup-mysql - A hook for Bacula to backup mysql databases using mysqlhot
 
 This is a script to be setup as C<Client Run Before Job> in Bacula.
 
+=head1 CONFIGURATION
+
+Config starts with C<E<lt>clustersE<gt>> block, which you can define several
+database instances to be backed up.
+
+Each C<cluster> should define connection dsn and tables to be backed up.
+
+To define connection dsn, you can also define common options in
+C<E<lt>clientE<gt>> section, those options would be shared for each cluster
+which has not overriden the specific option.
+
+In C<E<lt>clusterE<gt>> sections, you should list databases to be backed up.
+You can use C<include_database> option to implicitly list which databases to be
+backed up. If you omit C<include_database> option, all databases are backed up
+which can be seen with C<show tables> query.  To exclude databases from that
+list you can use C<exclude_database> options.
+
+=head1 EXAMPLE CONFIGURATION
+
+  # clusters to backup
+  # there is nothing special about name "mysql", name just picked as convience
+  <clusters>
+    cluster mysql
+  </clusters>
+
+  # client connection parameters, can be overriden per cluster
+  <client>
+    user mysql
+    password secret
+  </client>
+
+  # global options, can be overriden per cluster
+  <options>
+    tmpdir /srv/bacula/tmp
+    outdir /srv/bacula/mysql
+  </options>
+
+  # mysql cluster: backup all but mysql database
+  <cluster mysql>
+    socket /var/lib/mysql/mysql.sock
+    exclude_database mysql
+  </cluster>
+
 =head1 AUTHOR
 
-Copyright (C) 2009-2011, Elan RuusamE<auml>e <glen@delfi.ee>
+Copyright (C) 2009-2012, Elan RuusamE<auml>e <glen@delfi.ee>
 
 =head1 SEE ALSO
 
