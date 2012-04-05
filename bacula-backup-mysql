@@ -57,13 +57,13 @@ if (!-d $tmpdir && !mkdir($tmpdir) && !-d $tmpdir) {
 
 # process each cluster
 for my $cluster ($c->get('clusters', 'cluster')) {
-	print ">>> $cluster\n";
+	print ">>> cluster: $cluster\n";
 	if ($cleanup) {
 		cleanup_cluster($cluster);
 	} else {
 		backup_cluster($cluster);
 	}
-	print "<<< $cluster\n";
+	print "<<< end cluster: $cluster\n";
 }
 
 #
@@ -76,9 +76,15 @@ sub mysqlhotcopy {
 	# i.e: include_database teensForum5./~(phorum_forums|phorum_users)/
 	my ($database) = $db =~ /^([^\.]+)/;
 
-	print ">>>> mysqlhotcopy $db\n";
-
 	my $dstdir = tempdir("bbm.XXXXXX", DIR => $tmpdir);
+
+	# remove output dir before backup,
+	# otherwise the disk space requirement would double
+	my $dirname = "$backup_dir/$cluster/$database";
+	if (-d $dirname) {
+		print ">>>> rmtree $dirname\n";
+		rmtree($dirname);
+	}
 
 	# make backup with mysqlhotcopy
 	my @shell = ('mysqlhotcopy');
@@ -86,6 +92,7 @@ sub mysqlhotcopy {
 	push(@shell, '-p', $password) if $password;
 	push(@shell, '-S', $socket) if $socket;
 	push(@shell, $db, $dstdir);
+	print ">>>> mysqlhotcopy $database\n";
 	system(@shell) == 0 or die "mysqlhotcopy failed: $?\n";
 
 	# put it to "production dir"
@@ -93,11 +100,6 @@ sub mysqlhotcopy {
 	if (!-d $cluster_dir && !mkdir($cluster_dir) && !-d $cluster_dir) {
 		rmtree($dstdir);
 		die "cluster dir '$cluster_dir' not present and can't be created\n";
-	}
-
-	my $dirname = "$backup_dir/$cluster/$database";
-	if (-d $dirname) {
-		rmtree($dirname);
 	}
 
 	my $srcdir = "$dstdir/$database";

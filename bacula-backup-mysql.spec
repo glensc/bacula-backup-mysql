@@ -1,7 +1,7 @@
 %include	/usr/lib/rpm/macros.perl
 Summary:	MySQL backup hook for Bacula
 Name:		bacula-backup-mysql
-Version:	0.4
+Version:	0.5
 Release:	1
 License:	GPL v2
 Group:		Applications/Databases
