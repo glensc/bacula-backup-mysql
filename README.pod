@@ -22,7 +22,7 @@ This is a script to be setup as C<Client Run Before Job> in Bacula.
 Config starts with C<E<lt>clustersE<gt>> block, which you can define several
 database instances to be backed up.
 
-Each C<cluster> should define connection dsn and tables to be backed up.
+Each C<cluster> should define connection dsn and databases to be backed up.
 
 To define connection dsn, you can also define common options in
 C<E<lt>clientE<gt>> section, those options would be shared for each cluster
@@ -35,7 +35,7 @@ which can be seen with C<show tables> query. To exclude databases from that
 list you can use C<exclude_database> options.
 
 Additionally C<include_database> supports table regexp, which is passed
-directly to mysqlhotcopy(1). This allows you to include or exclude tables from
+directly to L<mysqlhotcopy(1)>. This allows you to include or exclude tables from
 each database backup.
 
 =head1 EXAMPLE CONFIGURATION
