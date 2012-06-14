@@ -81,6 +81,7 @@ Copyright (C) 2009-2012, Elan RuusamE<auml>e <glen@delfi.ee>
 
 =head1 SEE ALSO
 
-http://www.bacula.org/
+http://www.bacula.org/,
+L<Bacula wiki: Application specific backups: mysql|http://wiki.bacula.org/doku.php?id=application_specific_backups:mysql>
 
 =cut
