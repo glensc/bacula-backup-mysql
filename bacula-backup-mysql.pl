@@ -67,6 +67,61 @@ for my $cluster ($c->get('clusters', 'cluster')) {
 }
 
 #
+# Usage: mysqldump $CLUSTER $DATABASE $TABLES $USERNAME $PASSWORD $SOCKET
+#
+sub mysqldump {
+	my ($cluster, $database, $tables, $user, $password, $socket) = @_;
+
+	my $dstdir = tempdir("bbm.XXXXXX", DIR => $tmpdir);
+
+	# remove output dir before backup,
+	# otherwise the disk space requirement would double
+	my $dirname = "$backup_dir/$cluster/$database";
+	if (-d $dirname) {
+		print ">>>> rmtree $dirname\n";
+		rmtree($dirname);
+	}
+
+	# make backup with mysqldump
+	my @shell = ('mysqldump');
+	push(@shell, '-u', $user) if $user;
+	push(@shell, '-p', $password) if $password;
+	push(@shell, '-S', $socket) if $socket;
+	# use -r option so we don't have to mess with output redirection
+	push(@shell, '-r', "$dstdir/mysqldump.sql");
+
+	push(@shell, '--flush-logs');
+	# be sure to dump routines as well
+	push(@shell, '--routines');
+	# single transaction to make snapshot of database
+	push(@shell, '--single-transaction');
+	# skip dump date, so if the data did not change, the dump will be identical
+	push(@shell, '--skip-dump-date');
+	# skip drop table so that accidentally loading dump to db already having that table won't destroy your data
+	push(@shell, '--skip-add-drop-table');
+
+	push(@shell, $database, @$tables);
+	print ">>>> mysqldump $database\n";
+	system(@shell) == 0 or die "mysqldump failed: $?\n";
+
+	# put it to "production dir"
+	my $cluster_dir = "$backup_dir/$cluster";
+	if (!-d $cluster_dir && !mkdir($cluster_dir) && !-d $cluster_dir) {
+		rmtree($dstdir);
+		die "cluster dir '$cluster_dir' not present and can't be created\n";
+	}
+
+	my $srcdir = $dstdir;
+	unless (rename($srcdir, $dirname)) {
+		my $err = $!;
+		rmtree($dstdir);
+		die "Rename '$srcdir'->'$dirname' failed: $err\n";
+	}
+
+	print "<<<< mysqldump $database\n";
+}
+
+#
 # Usage: mysqlhotcopy $CLUSTER $DATABASE $USERNAME $PASSWORD $SOCKET
 #
 sub mysqlhotcopy {
@@ -130,6 +185,11 @@ sub backup_cluster {
 	my $password = $c->get($cluster, 'password') || $c->get('client', 'password');
 	my $socket = $c->get($cluster, 'socket') || $c->get('client', 'socket');
 
+	# dump type: mysqlhotcopy, mysqldump
+	my $dump_type = $c->get($cluster,'dump_type') || 'mysqlhotcopy';
+
+	my $dbh = new BBM::DB($user, $password, $socket);
+
 	# get databases to backup
 	my @include = $c->get($cluster, 'include_database');
 	my @exclude = $c->get($cluster, 'exclude_database');
@@ -138,7 +198,6 @@ sub backup_cluster {
 	my %dbs = map { $_ => 1 } @include;
 
 	if (@exclude or !@include) {
-		my $dbh = new BBM::DB($user, $password, $socket);
 		my $sth = $dbh->prepare("show databases");
 		$sth->execute();
 		while (my($dbname) = $sth->fetchrow_array) {
@@ -146,7 +205,6 @@ sub backup_cluster {
 			next if lc($dbname) eq 'performance_schema';
 			$dbs{$dbname} = 1;
 		}
-		undef $dbh;
 	}
 
 	# remove excluded databases
@@ -154,7 +212,16 @@ sub backup_cluster {
 
 	# now do the backup
 	foreach my $db (keys %dbs) {
-		mysqlhotcopy($cluster, $db, $user, $password, $socket);
+		if ($dump_type eq 'mysqldump') {
+			my ($db, $tables) = BBM::DB::get_backup_tables($dbh, $db);
+			mysqldump($cluster, $db, $tables, $user, $password, $socket);
+
+		} elsif ($dump_type eq 'mysqlhotcopy') {
+			mysqlhotcopy($cluster, $db, $user, $password, $socket);
+
+		} else {
+			die "Unknown Dump type: $dump_type";
+		}
 	}
 }
 
@@ -169,6 +236,60 @@ sub new {
 	$dsn .= "mysql_socket=$socket" if $socket;
 	my $dbh = DBI->connect("DBI:mysql:$dsn", $user, $password, { PrintError => 0, RaiseError => 1 });
 	return $dbh;
+}
+
+# get list of tables
+# @param DBI::db $dbh
+# @param string $db
+# @static
+sub get_list_of_tables {
+	my ($dbh, $db) = @_;
+
+	my $tables = $dbh->selectall_arrayref('SHOW TABLES FROM ' .  $dbh->quote_identifier($db));
+	my @ignore_tables = ();
+
+	# Ignore tables for the mysql database
+	if ($db eq 'mysql') {
+		@ignore_tables = qw(general_log slow_log schema apply_status);
+	}
+
+	my @res = ();
+	if ($#ignore_tables > 1) {
+		my @tmp = (map { $_->[0] } @$tables);
+		for my $t (@tmp) {
+			push(@res, $t) if not exists { map { $_=>1 } @ignore_tables }->{$t};
+		}
+	} else {
+		@res = (map { $_->[0] } @$tables);
+	}
+
+	return @res;
+}
+
+# process regex from $db (if any) and return tables to be backed up
+# it uses similar regex as mysqlhotcopy.
+# i.e to dump teensForum5 db without phorum_forums and phorum_users tables:
+# include_database teensForum5./~(phorum_forums|phorum_users)/
+sub get_backup_tables {
+	my ($dbh, $db) = @_;
+
+	my $t_regex = '.*';
+	if ($db =~ s{^([^\.]+)\./(.+)/$}{$1}) {
+		$t_regex = $2;
+	}
+
+	my @dbh_tables = BBM::DB::get_list_of_tables($dbh, $db);
+
+	## generate regex for tables/files
+	my $negated = $t_regex =~ s/^~//;   ## note and remove negation operator
+	$t_regex = qr/$t_regex/;            ## make regex string from user regex
+
+	## filter (out) tables specified in t_regex
+	@dbh_tables = ($negated
+					? grep { $_ !~ $t_regex } @dbh_tables
+					: grep { $_ =~ $t_regex } @dbh_tables);
+
+	return ($db, \@dbh_tables);
 }
 
 package BBM::Config;
