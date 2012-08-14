@@ -38,6 +38,9 @@ Additionally C<include_database> supports table regexp, which is passed
 directly to L<mysqlhotcopy(1)>. This allows you to include or exclude tables from
 each database backup.
 
+Since v0.6 it's possible to do SQL dump backups with L<mysqldump(1)>. Use this if you want to backup InnoDB databases.
+Option name is C<dump_type>, which takes values C<mysqlhotcopy> (default) and C<mysqldump>.
+
 =head1 EXAMPLE CONFIGURATION
 
   # clusters to backup
