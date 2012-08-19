@@ -209,7 +209,7 @@ sub backup_cluster {
 		while (my($dbname) = $sth->fetchrow_array) {
 			next if lc($dbname) eq 'information_schema';
 			next if lc($dbname) eq 'performance_schema';
-			next if exists($dbs{lc($dbname)});
+			next if exists $dbs{$dbname};
 			$dbs{$dbname} = undef;
 		}
 	}
