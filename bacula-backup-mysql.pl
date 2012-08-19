@@ -194,8 +194,20 @@ sub backup_cluster {
 	my @include = $c->get($cluster, 'include_database');
 	my @exclude = $c->get($cluster, 'exclude_database');
 
-	# start with include list
-	my %dbs = map { $_ => 1 } @include;
+	# hash with keys which are database names that we want to backup
+	my %dbs = ();
+	# start with the database names that are to be included
+	if ($dump_type eq 'mysqlhotcopy') {
+		# split include array into database name and optional table regex
+		foreach (@include) {
+			my ($dbname, $optional_table_regex) = split(/\./, $_, 2);
+			$dbs{$dbname} = $optional_table_regex; # will be undef if it is just a plain database name
+		}
+	}
+	else {
+		# include array contains database names only
+		%dbs = map { $_ => undef } @include;
+	}
 
 	if (@exclude or !@include) {
 		my $sth = $dbh->prepare("show databases");
@@ -203,7 +215,8 @@ sub backup_cluster {
 		while (my($dbname) = $sth->fetchrow_array) {
 			next if lc($dbname) eq 'information_schema';
 			next if lc($dbname) eq 'performance_schema';
-			$dbs{$dbname} = 1;
+			next if exists($dbs{lc($dbname)});
+			$dbs{$dbname} = undef;
 		}
 	}
 
@@ -217,7 +230,14 @@ sub backup_cluster {
 			mysqldump($cluster, $db, $tables, $user, $password, $socket);
 
 		} elsif ($dump_type eq 'mysqlhotcopy') {
-			mysqlhotcopy($cluster, $db, $user, $password, $socket);
+			my $db_and_maybe_table_regex = undef;
+			if (defined($dbs{$db})) {
+				$db_and_maybe_table_regex = $db . "." . $dbs{$db};
+			}
+			else {
+				$db_and_maybe_table_regex = $db;
+			}
+			mysqlhotcopy($cluster, $db_and_maybe_table_regex, $user, $password, $socket);
 
 		} else {
 			die "Unknown Dump type: $dump_type";
