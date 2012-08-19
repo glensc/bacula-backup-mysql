@@ -1,6 +1,6 @@
 =head1 NAME
 
-bacula-backup-mysql - A hook for Bacula to backup mysql databases using mysqlhotcopy.
+bacula-backup-mysql - A hook for Bacula to backup mysql databases using mysqlhotcopy or mysqldump.
 
 =head1 SYNOPSIS
 
@@ -114,7 +114,6 @@ if your version nees patching.
 =head1 AUTHOR
 
 Copyright (C) 2009-2012, Elan RuusamE<auml>e <glen@delfi.ee>
-
 
 =head1 SEE ALSO
 
