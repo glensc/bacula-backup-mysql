@@ -101,9 +101,20 @@ the process.
     include_database teensForum5./~(phorum_forums|phorum_users)/
   </cluster>
 
+=head1 BUGS
+
+If you find bugs in L<bacula-backup-mysql(1)>,
+file the reports into L<Bugtracker|https://github.com/glensc/bacula-backup-mysql/issues>
+or even better, send L<Pull Request|https://github.com/glensc/bacula-backup-mysql/pulls> with a fix.
+
+There are also bugs in L<mysqlhotcopy(1)>,
+see from L<Wiki|https://github.com/glensc/bacula-backup-mysql/wiki>
+if your version nees patching.
+
 =head1 AUTHOR
 
 Copyright (C) 2009-2012, Elan RuusamE<auml>e <glen@delfi.ee>
+
 
 =head1 SEE ALSO
 
