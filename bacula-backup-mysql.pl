@@ -146,6 +146,12 @@ sub mysqlhotcopy {
 	push(@shell, '-u', $user) if $user;
 	push(@shell, '-p', $password) if $password;
 	push(@shell, '-S', $socket) if $socket;
+
+	my $record_log_pos = $c->get($cluster, 'record_log_pos');
+	if ($record_log_pos) {
+		push(@shell, '--record_log_pos', $record_log_pos);
+	}
+
 	push(@shell, $db, $dstdir);
 	print ">>>> mysqlhotcopy $database\n";
 	system(@shell) == 0 or die "mysqlhotcopy failed: $?\n";
@@ -225,6 +231,19 @@ sub backup_cluster {
 			mysqldump($cluster, $db, $tables, $user, $password, $socket);
 
 		} elsif ($dump_type eq 'mysqlhotcopy') {
+			my $record_log_pos = $c->get($cluster, 'record_log_pos');
+			if ($record_log_pos) {
+				# check that the table exists, to give early error
+				eval {
+					$dbh->do("select ".
+						"host, time_stamp, log_file, log_pos, ".
+						"master_host, master_log_file, master_log_pos ".
+						"from $record_log_pos where 1 != 1"
+					);
+				};
+				die "Error accessing log_pos table ($record_log_pos): $@" if $@;
+			}
+
 			mysqlhotcopy($cluster, $db, $user, $password, $socket);
 
 		} else {

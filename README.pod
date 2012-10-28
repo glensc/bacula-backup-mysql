@@ -53,6 +53,10 @@ C<include_database> option can be further configured to specify the
 exact tables to be backed up, giving the user far more control over
 the process.
 
+Dump type C<mysqlhotcopy> allows you to pass C<--record_log_pos log-pos-table>
+option to C<mysqlhotcopy>. The C<log-pos-table> table must already exist, see
+C<perldoc mysqlhotcopy> for the table schema.
+
 =head1 EXAMPLE CONFIGURATION
 
   # clusters to backup
