@@ -26,6 +26,8 @@ use DBI;
 use File::Temp qw(tempdir);
 use File::Path qw(rmtree);
 
+our $VERSION = '0.6.1';
+
 # path to Apache HTTPd-style config
 my $config = '/etc/bacula/backup-mysql.conf';
 my $c = new BBM::Config($config);
