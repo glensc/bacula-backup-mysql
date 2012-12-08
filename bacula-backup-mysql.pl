@@ -87,7 +87,7 @@ sub mysqldump {
 	# make backup with mysqldump
 	my @shell = ('mysqldump');
 	push(@shell, '-u', $user) if $user;
-	push(@shell, '-p', $password) if $password;
+	push(@shell, "-p$password") if $password;
 	push(@shell, '-S', $socket) if $socket;
 	# use -r option so we don't have to mess with output redirection
 	push(@shell, '-r', "$dstdir/mysqldump.sql");
