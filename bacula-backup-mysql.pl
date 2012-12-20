@@ -101,6 +101,9 @@ sub mysqldump {
 	push(@shell, '--skip-dump-date');
 	# skip drop table so that accidentally loading dump to db already having that table won't destroy your data
 	push(@shell, '--skip-add-drop-table');
+	# This causes the binary log position and filename to be appended to the output.
+	# if equal to 2, that command will be prefixed with a comment symbol.
+	push(@shell, '--master-data=2');
 
 	push(@shell, $database, @$tables);
 	print ">>>> mysqldump $database\n";
