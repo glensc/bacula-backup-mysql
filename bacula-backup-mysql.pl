@@ -151,6 +151,7 @@ sub mysqlhotcopy {
 
 	# make backup with mysqlhotcopy
 	my @shell = ('mysqlhotcopy');
+	push(@shell, '--flushlog');
 	push(@shell, '-u', $user) if $user;
 	push(@shell, '-p', $password) if $password;
 	push(@shell, '-S', $socket) if $socket;
