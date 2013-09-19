@@ -21,6 +21,8 @@ our $cleanup;
 
 package BBM;
 use strict;
+use warnings;
+use Carp;
 use POSIX qw(setuid setgid);
 use DBI;
 use File::Temp qw(tempdir);
@@ -29,14 +31,14 @@ use File::Path qw(rmtree);
 our $VERSION = '0.6.2';
 
 # path to Apache HTTPd-style config
-my $config = '/etc/bacula/backup-mysql.conf';
-my $c = new BBM::Config($config);
+my $configfile = '/etc/bacula/backup-mysql.conf';
+my $c = BBM::Config->new($configfile);
 
 # now change to user mysql after we've read config
-unless ($<) {
+if (!$<) {
 	my $uid = getpwnam('mysql');
 	my $gid = getgrnam('mysql');
-	die "Can't find user/group mysql\n" unless $uid or $gid;
+	croak "Can't find user/group mysql\n" if !$uid || !$gid;
 
 	# CWD could not be accessible for mysql user
 	chdir("/");
@@ -47,14 +49,14 @@ unless ($<) {
 }
 
 # setup tmpdir
-my $backup_dir = $c->get('options', 'outdir') or die "'outdir' not defined in config\n";
-my $tmpdir = $c->get('options', 'tmpdir') or die "'tmpdir' not defined in config\n";
+my $backup_dir = $c->get('options', 'outdir') or croak "'outdir' not defined in config\n";
+my $tmpdir = $c->get('options', 'tmpdir') or croak "'tmpdir' not defined in config\n";
 
 if (!-d $backup_dir && !mkdir($backup_dir) && !-d $backup_dir) {
-	die "backup dir '$backup_dir' not present and can't be created\n";
+	croak "backup dir '$backup_dir' not present and can't be created\n";
 }
 if (!-d $tmpdir && !mkdir($tmpdir) && !-d $tmpdir) {
-	die "tmpdir '$tmpdir' not present and can't be created\n";
+	croak "tmpdir '$tmpdir' not present and can't be created\n";
 }
 
 # process each cluster
@@ -107,23 +109,24 @@ sub mysqldump {
 
 	push(@shell, $database, @$tables);
 	print ">>>> mysqldump $database\n";
-	system(@shell) == 0 or die "mysqldump failed: $?\n";
+	system(@shell) == 0 or croak "mysqldump failed: $?\n";
 
 	# put it to "production dir"
 	my $cluster_dir = "$backup_dir/$cluster";
 	if (!-d $cluster_dir && !mkdir($cluster_dir) && !-d $cluster_dir) {
 		rmtree($dstdir);
-		die "cluster dir '$cluster_dir' not present and can't be created\n";
+		croak "cluster dir '$cluster_dir' not present and can't be created\n";
 	}
 
 	my $srcdir = $dstdir;
-	unless (rename($srcdir, $dirname)) {
+	if (!rename($srcdir, $dirname)) {
 		my $err = $!;
 		rmtree($dstdir);
-		die "Rename '$srcdir'->'$dirname' failed: $err\n";
+		croak "Rename '$srcdir'->'$dirname' failed: $err\n";
 	}
 
 	print "<<<< mysqldump $database\n";
+	return;
 }
 
 #
@@ -159,25 +162,26 @@ sub mysqlhotcopy {
 
 	push(@shell, $db, $dstdir);
 	print ">>>> mysqlhotcopy $database\n";
-	system(@shell) == 0 or die "mysqlhotcopy failed: $?\n";
+	system(@shell) == 0 or croak "mysqlhotcopy failed: $?\n";
 
 	# put it to "production dir"
 	my $cluster_dir = "$backup_dir/$cluster";
 	if (!-d $cluster_dir && !mkdir($cluster_dir) && !-d $cluster_dir) {
 		rmtree($dstdir);
-		die "cluster dir '$cluster_dir' not present and can't be created\n";
+		croak "cluster dir '$cluster_dir' not present and can't be created\n";
 	}
 
 	my $srcdir = "$dstdir/$database";
-	unless (rename($srcdir, $dirname)) {
+	if (!rename($srcdir, $dirname)) {
 		my $err = $!;
 		rmtree($dstdir);
-		die "Rename '$srcdir'->'$dirname' failed: $err\n";
+		croak "Rename '$srcdir'->'$dirname' failed: $err\n";
 	}
 
-	rmdir($dstdir) or warn $!;
+	rmdir($dstdir) or carp $!;
 
 	print "<<<< mysqlhotcopy $database\n";
+	return;
 }
 
 sub cleanup_cluster {
@@ -186,6 +190,7 @@ sub cleanup_cluster {
 	print ">>>> cleanup $cluster_dir\n";
 	rmtree($cluster_dir);
 	print "<<<< cleanup $cluster_dir\n";
+	return;
 }
 
 sub backup_cluster {
@@ -199,7 +204,7 @@ sub backup_cluster {
 	# dump type: mysqlhotcopy, mysqldump
 	my $dump_type = $c->get($cluster,'dump_type') || 'mysqlhotcopy';
 
-	my $dbh = new BBM::DB($user, $password, $socket);
+	my $dbh = BBM::DB->new($user, $password, $socket);
 
 	# get databases to backup
 	my @include = $c->get($cluster, 'include_database');
@@ -214,7 +219,7 @@ sub backup_cluster {
 		$dbs{$dbname} = $optional_table_regex; # will be undef if it is just a plain database name
 	}
 
-	if (@exclude or !@include) {
+	if (@exclude || !@include) {
 		my $sth = $dbh->prepare("show databases");
 		$sth->execute();
 		while (my($dbname) = $sth->fetchrow_array) {
@@ -246,15 +251,16 @@ sub backup_cluster {
 						"from $record_log_pos where 1 != 1"
 					);
 				};
-				die "Error accessing log_pos table ($record_log_pos): $@" if $@;
+				croak "Error accessing log_pos table ($record_log_pos): $@" if $@;
 			}
 
 			mysqlhotcopy($cluster, $db, $user, $password, $socket);
 
 		} else {
-			die "Unknown Dump type: $dump_type";
+			croak "Unknown Dump type: $dump_type";
 		}
 	}
+	return;
 }
 
 package BBM::DB;
@@ -262,8 +268,7 @@ use strict;
 
 # DB class for simple Database connection
 sub new {
-	my $self = shift;
-	my ($user, $password, $socket) = @_;
+	my ($self, $user, $password, $socket) = @_;
 	my $dsn = '';
 	$dsn .= "mysql_socket=$socket" if $socket;
 	my $dbh = DBI->connect("DBI:mysql:$dsn", $user, $password, { PrintError => 0, RaiseError => 1 });
@@ -333,9 +338,9 @@ sub new {
 	my $class = ref($self) || $self;
 	my $file = shift;
 
-	my $config = new Config::General(-ConfigFile => $file, -LowerCaseNames => 1);
+	my $config = Config::General->new(-ConfigFile => $file, -LowerCaseNames => 1);
 	my $this = { $config->getall() };
-	bless($this, $class);
+	return bless($this, $class);
 }
 
 sub get {
@@ -343,13 +348,13 @@ sub get {
 	my $h = $self;
 
 	# descend to [cluster] if $section not present in root tree
-	unless (exists $h->{$section}) {
+	if (!exists $h->{$section}) {
 		$h = $h->{cluster};
 	}
 
 	# pay attention if callee wanted arrays
-	return wantarray ? () : undef unless exists $h->{$section};
-	return wantarray ? () : undef unless exists $h->{$section}->{$key};
+	return wantarray ? () : undef if !exists $h->{$section};
+	return wantarray ? () : undef if !exists $h->{$section}->{$key};
 
 	# deref if wanted array and is arrayref
 	return @{$h->{$section}->{$key}} if wantarray && ref $h->{$section}->{$key} eq 'ARRAY';
