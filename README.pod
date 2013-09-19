@@ -55,7 +55,10 @@ the process.
 
 Dump type C<mysqlhotcopy> allows you to pass C<--record_log_pos log-pos-table>
 option to C<mysqlhotcopy>. The C<log-pos-table> table must already exist, see
-C<perldoc mysqlhotcopy> for the table schema.
+C<perldoc mysqlhotcopy> for the table schema. Please note that this option is
+not safe to use when backing up more than one database, because current
+operation backs up each database with separate C<mysqlhotcopy> call and so the
+log pos is saved with each call overwriting the previous.
 
 =head1 EXAMPLE CONFIGURATION
 
@@ -114,6 +117,9 @@ or even better, send L<Pull Request|https://github.com/glensc/bacula-backup-mysq
 There are also bugs in L<mysqlhotcopy(1)>,
 see from L<Wiki|https://github.com/glensc/bacula-backup-mysql/wiki>
 if your version nees patching.
+
+In C<mysqlhotcopy> mode C<record_log_pos> option is useless if cluster contains
+more than one database.
 
 =head1 AUTHOR
 
