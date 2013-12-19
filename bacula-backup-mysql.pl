@@ -163,7 +163,17 @@ sub mysqlhotcopy {
 
 	push(@shell, $db, $dstdir);
 	print ">>>> mysqlhotcopy $database\n";
-	system(@shell) == 0 or croak "mysqlhotcopy failed: $?\n";
+	my $rc = system(@shell);
+
+	# handle exit code 9 specially for empty databases. see issue #3
+	if ($rc == 9) {
+		print "mysqlhotcopy $database empty";
+		mkdir("$dstdir/$database");
+	} elsif ($rc == 0) {
+		print "mysqlhotcopy $database succeeded";
+	} else {
+		croak "mysqlhotcopy $database failed: $rc\n";
+	}
 
 	# put it to "production dir"
 	my $cluster_dir = "$backup_dir/$cluster";
@@ -283,7 +293,7 @@ sub new {
 sub get_list_of_tables {
 	my ($dbh, $db) = @_;
 
-	my $tables = $dbh->selectall_arrayref('SHOW TABLES FROM ' .  $dbh->quote_identifier($db));
+	my $tables = $dbh->selectall_arrayref('SHOW TABLES FROM ' . $dbh->quote_identifier($db));
 	my @ignore_tables = ();
 
 	# Ignore tables for the mysql database
