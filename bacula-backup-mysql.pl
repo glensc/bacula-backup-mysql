@@ -32,7 +32,7 @@ use File::Path qw(rmtree);
 use constant EX_UNAVAILABLE => 69;
 use constant EX_SOFTWARE => 70;
 
-our $VERSION = '0.6.2';
+our $VERSION = '0.7-dev';
 
 # path to Apache HTTPd-style config
 my $configfile = '/etc/bacula/backup-mysql.conf';
