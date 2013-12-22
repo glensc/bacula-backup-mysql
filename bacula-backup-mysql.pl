@@ -237,7 +237,7 @@ sub backup_cluster {
 	my $socket = $c->get($cluster, 'socket') || $c->get('client', 'socket');
 
 	# dump type: mysqlhotcopy, mysqldump
-	my $dump_type = $c->get($cluster,'dump_type') || 'mysqlhotcopy';
+	my $dump_type = $c->get($cluster, 'dump_type') || 'mysqlhotcopy';
 
 	my $dbh = BBM::DB->new($user, $password, $socket);
 
@@ -273,27 +273,21 @@ sub backup_cluster {
 	# now do the backup
 	while (my($db, $regex) = each %dbs) {
 		$db = $db . '.' . $regex if $regex;
-		if ($dump_type eq 'mysqldump') {
-			my ($db, $tables) = BBM::DB::get_backup_tables($dbh, $db);
-			eval {
+		eval {
+			if ($dump_type eq 'mysqldump') {
+				my ($db, $tables) = BBM::DB::get_backup_tables($dbh, $db);
 				$rc = mysqldump($dbh, $cluster, $db, $tables, $user, $password, $socket);
-			};
-			if ($@) {
-				warn "ERROR: $@\n";
-				$rc = EX_SOFTWARE;
-			}
 
-		} elsif ($dump_type eq 'mysqlhotcopy') {
-			eval {
+			} elsif ($dump_type eq 'mysqlhotcopy') {
 				$rc = mysqlhotcopy($dbh, $cluster, $db, $user, $password, $socket);
-			};
-			if ($@) {
-				warn "ERROR: $@\n";
-				$rc = EX_SOFTWARE;
-			}
 
-		} else {
-			croak "Unknown Dump type: $dump_type";
+			} else {
+				croak "Unknown Dump type: $dump_type";
+			}
+		};
+		if ($@) {
+			warn "ERROR: $@\n";
+			$rc = EX_SOFTWARE;
 		}
 
 		$exit = $rc if !defined($exit) or $rc > $exit;
