@@ -85,7 +85,7 @@ exit($exit);
 # Usage: mysqldump $CLUSTER $DATABASE $TABLES $USERNAME $PASSWORD $SOCKET
 #
 sub mysqldump {
-	my ($cluster, $database, $tables, $user, $password, $socket) = @_;
+	my ($dbh, $cluster, $database, $tables, $user, $password, $socket) = @_;
 
 	my $dstdir = tempdir("bbm.XXXXXX", DIR => $tmpdir);
 
@@ -144,11 +144,17 @@ sub mysqldump {
 # Usage: mysqlhotcopy $CLUSTER $DATABASE $USERNAME $PASSWORD $SOCKET
 #
 sub mysqlhotcopy {
-	my ($cluster, $db, $user, $password, $socket) = @_;
+	my ($dbh, $cluster, $db, $user, $password, $socket) = @_;
 
 	# strip $database to contain only db name, as the rest of the code assumes $database is just database name
 	# i.e: include_database teensForum5./~(phorum_forums|phorum_users)/
 	my ($database) = $db =~ /^([^\.]+)/;
+
+	my (undef, $tables) = BBM::DB::get_backup_tables($dbh, $db);
+	if (!@$tables) {
+		print ">>>> mysqlhotcopy $database: tables to hot-copy\n";
+		return 0;
+	}
 
 	my $dstdir = tempdir("bbm.XXXXXX", DIR => $tmpdir);
 
@@ -176,13 +182,7 @@ sub mysqlhotcopy {
 	print ">>>> mysqlhotcopy $database\n";
 	my $rc = system(@shell) >> 8;
 
-	# handle exit code 255 specially for empty databases. see issue #3
-	if ($rc == 255) {
-		$rc = 0;
-		print "mysqlhotcopy $database empty\n";
-		mkdir("$dstdir/$database");
-	} elsif ($rc == 0) {
-	} else {
+	if ($rc) {
 		warn "mysqlhotcopy $database failed: $rc\n";
 		return $rc;
 	}
@@ -264,7 +264,7 @@ sub backup_cluster {
 		if ($dump_type eq 'mysqldump') {
 			my ($db, $tables) = BBM::DB::get_backup_tables($dbh, $db);
 			eval {
-				$rc = mysqldump($cluster, $db, $tables, $user, $password, $socket);
+				$rc = mysqldump($dbh, $cluster, $db, $tables, $user, $password, $socket);
 			};
 			if ($@) {
 				warn "ERROR: $@\n";
@@ -286,7 +286,7 @@ sub backup_cluster {
 			}
 
 			eval {
-				$rc = mysqlhotcopy($cluster, $db, $user, $password, $socket);
+				$rc = mysqlhotcopy($dbh, $cluster, $db, $user, $password, $socket);
 			};
 			if ($@) {
 				warn "ERROR: $@\n";
@@ -318,6 +318,8 @@ sub new {
 }
 
 # get list of tables
+#
+# NOTE: This is taken from mysqlhotcopy, try to keep it in sync
 # @param DBI::db $dbh
 # @param string $db
 # @static
