@@ -28,6 +28,10 @@ use DBI;
 use File::Temp qw(tempdir);
 use File::Path qw(rmtree);
 
+# http://www.gsp.com/cgi-bin/man.cgi?section=3&topic=sysexits
+use constant EX_UNAVAILABLE => 69;
+use constant EX_SOFTWARE => 70;
+
 our $VERSION = '0.6.2';
 
 # path to Apache HTTPd-style config
@@ -60,15 +64,22 @@ if (!-d $tmpdir && !mkdir($tmpdir) && !-d $tmpdir) {
 }
 
 # process each cluster
+my $exit;
 for my $cluster ($c->get('clusters', 'cluster')) {
+	my $rc;
 	print ">>> cluster: $cluster\n";
 	if ($cleanup) {
-		cleanup_cluster($cluster);
+		$rc = cleanup_cluster($cluster);
 	} else {
-		backup_cluster($cluster);
+		$rc = backup_cluster($cluster);
 	}
+	# add error code if one was set
+	$exit = $rc if !defined($exit) or $rc > $exit;
 	print "<<< end cluster: $cluster\n";
 }
+# if no clusters were processed, exit with UNAVAILABLE status
+$exit = EX_UNAVAILABLE unless defined $exit;
+exit($exit);
 
 #
 # Usage: mysqldump $CLUSTER $DATABASE $TABLES $USERNAME $PASSWORD $SOCKET
@@ -163,16 +174,17 @@ sub mysqlhotcopy {
 
 	push(@shell, $db, $dstdir);
 	print ">>>> mysqlhotcopy $database\n";
-	my $rc = system(@shell);
+	my $rc = system(@shell) >> 8;
 
 	# handle exit code 9 specially for empty databases. see issue #3
 	if ($rc == 9) {
-		print "mysqlhotcopy $database empty";
+		$rc = 0;
+		print "mysqlhotcopy $database empty\n";
 		mkdir("$dstdir/$database");
 	} elsif ($rc == 0) {
-		print "mysqlhotcopy $database succeeded";
 	} else {
-		croak "mysqlhotcopy $database failed: $rc\n";
+		warn "mysqlhotcopy $database failed: $rc\n";
+		return $rc;
 	}
 
 	# put it to "production dir"
@@ -192,7 +204,7 @@ sub mysqlhotcopy {
 	rmdir($dstdir) or carp $!;
 
 	print "<<<< mysqlhotcopy $database\n";
-	return;
+	return $rc;
 }
 
 sub cleanup_cluster {
@@ -244,12 +256,20 @@ sub backup_cluster {
 	# remove excluded databases
 	delete @dbs{@exclude};
 
+	my ($exit, $rc);
+
 	# now do the backup
 	while (my($db, $regex) = each %dbs) {
 		$db = $db . '.' . $regex if $regex;
 		if ($dump_type eq 'mysqldump') {
 			my ($db, $tables) = BBM::DB::get_backup_tables($dbh, $db);
-			mysqldump($cluster, $db, $tables, $user, $password, $socket);
+			eval {
+				$rc = mysqldump($cluster, $db, $tables, $user, $password, $socket);
+			};
+			if ($@) {
+				warn "ERROR: $@\n";
+				$rc = EX_SOFTWARE;
+			}
 
 		} elsif ($dump_type eq 'mysqlhotcopy') {
 			my $record_log_pos = $c->get($cluster, 'record_log_pos');
@@ -265,13 +285,24 @@ sub backup_cluster {
 				croak "Error accessing log_pos table ($record_log_pos): $@" if $@;
 			}
 
-			mysqlhotcopy($cluster, $db, $user, $password, $socket);
+			eval {
+				$rc = mysqlhotcopy($cluster, $db, $user, $password, $socket);
+			};
+			if ($@) {
+				warn "ERROR: $@\n";
+				$rc = EX_SOFTWARE;
+			}
 
 		} else {
 			croak "Unknown Dump type: $dump_type";
 		}
+
+		$exit = $rc if !defined($exit) or $rc > $exit;
 	}
-	return;
+
+	# if nothing was processed, exit with UNAVAILABLE status
+	$exit = EX_UNAVAILABLE unless defined $exit;
+	return $exit;
 }
 
 package BBM::DB;
