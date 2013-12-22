@@ -146,6 +146,19 @@ sub mysqldump {
 sub mysqlhotcopy {
 	my ($dbh, $cluster, $db, $user, $password, $socket) = @_;
 
+	my $record_log_pos = $c->get($cluster, 'record_log_pos');
+	if ($record_log_pos) {
+		# check that the table exists, to give early error before mysqlhotcopy is invoked
+		eval {
+			$dbh->do("select ".
+				"host, time_stamp, log_file, log_pos, ".
+				"master_host, master_log_file, master_log_pos ".
+				"from $record_log_pos where 1 != 1"
+			);
+		};
+		croak "Error accessing log_pos table ($record_log_pos): $@" if $@;
+	}
+
 	# strip $database to contain only db name, as the rest of the code assumes $database is just database name
 	# i.e: include_database teensForum5./~(phorum_forums|phorum_users)/
 	my ($database) = $db =~ /^([^\.]+)/;
@@ -173,7 +186,6 @@ sub mysqlhotcopy {
 	push(@shell, '-p', $password) if $password;
 	push(@shell, '-S', $socket) if $socket;
 
-	my $record_log_pos = $c->get($cluster, 'record_log_pos');
 	if ($record_log_pos) {
 		push(@shell, '--record_log_pos', $record_log_pos);
 	}
@@ -272,19 +284,6 @@ sub backup_cluster {
 			}
 
 		} elsif ($dump_type eq 'mysqlhotcopy') {
-			my $record_log_pos = $c->get($cluster, 'record_log_pos');
-			if ($record_log_pos) {
-				# check that the table exists, to give early error
-				eval {
-					$dbh->do("select ".
-						"host, time_stamp, log_file, log_pos, ".
-						"master_host, master_log_file, master_log_pos ".
-						"from $record_log_pos where 1 != 1"
-					);
-				};
-				croak "Error accessing log_pos table ($record_log_pos): $@" if $@;
-			}
-
 			eval {
 				$rc = mysqlhotcopy($dbh, $cluster, $db, $user, $password, $socket);
 			};
