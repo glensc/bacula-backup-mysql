@@ -118,6 +118,10 @@ sub mysqldump {
 	# if equal to 2, that command will be prefixed with a comment symbol.
 	push(@shell, '--master-data=2');
 
+	# add arbitary options from config
+	my $options = $c->get($cluster, 'mysqldump_options');
+	push(@shell, split ' ', $options) if $options;
+
 	push(@shell, $database, @$tables);
 	print ">>>> mysqldump $database\n";
 	system(@shell) == 0 or croak "mysqldump failed: $?\n";
@@ -189,6 +193,10 @@ sub mysqlhotcopy {
 	if ($record_log_pos) {
 		push(@shell, '--record_log_pos', $record_log_pos);
 	}
+
+	# add arbitary options from config
+	my $options = $c->get($cluster, 'mysqlhotcopy_options');
+	push(@shell, split ' ', $options) if $options;
 
 	push(@shell, $db, $dstdir);
 	print ">>>> mysqlhotcopy $database\n";

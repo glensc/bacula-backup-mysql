@@ -44,6 +44,10 @@ backup; any C<exclude_database> options will reduce this list.
 Since v0.6 it's possible to do SQL dump backups with L<mysqldump(1)>. Use this if you want to backup InnoDB databases.
 Option name is C<dump_type>, which takes values C<mysqlhotcopy> (default) and C<mysqldump>.
 
+Since v0.7 you can pass arbitary options to C<mysqlhotcopy> or C<mysqldump>
+using C<mysqlhotcopy_options> or C<mysqldump_options> respectively. Use this to
+pass options like C<--old_server>.
+
 Ordinarily, using C<include_database> and C<exclude database> options
 in the same C<cluster> cause the C<include_database> option to be
 unnecessary, as the existence of any C<exclude_database> options implicitly
