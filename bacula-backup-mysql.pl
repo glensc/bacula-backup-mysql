@@ -176,8 +176,8 @@ sub mysqlhotcopy {
 	print ">>>> mysqlhotcopy $database\n";
 	my $rc = system(@shell) >> 8;
 
-	# handle exit code 9 specially for empty databases. see issue #3
-	if ($rc == 9) {
+	# handle exit code 255 specially for empty databases. see issue #3
+	if ($rc == 255) {
 		$rc = 0;
 		print "mysqlhotcopy $database empty\n";
 		mkdir("$dstdir/$database");
