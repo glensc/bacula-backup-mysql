@@ -233,7 +233,7 @@ sub cleanup_cluster {
 	print ">>>> cleanup $cluster_dir\n";
 	rmtree($cluster_dir);
 	print "<<<< cleanup $cluster_dir\n";
-	return;
+	return 0;
 }
 
 sub backup_cluster {
