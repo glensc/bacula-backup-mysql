@@ -32,7 +32,7 @@ use File::Path qw(rmtree);
 use constant EX_UNAVAILABLE => 69;
 use constant EX_SOFTWARE => 70;
 
-our $VERSION = '0.7.1';
+our $VERSION = '0.7.2';
 
 # path to Apache HTTPd-style config
 my $configfile = '/etc/bacula/backup-mysql.conf';
@@ -124,7 +124,12 @@ sub mysqldump {
 
 	push(@shell, $database, @$tables);
 	print ">>>> mysqldump $database\n";
-	system(@shell) == 0 or croak "mysqldump failed: $?\n";
+
+	my $rc = system(@shell) >> 8;
+	if ($rc) {
+		warn "mysqldump $database failed: $rc\n";
+		return $rc;
+	}
 
 	# put it to "production dir"
 	my $cluster_dir = "$backup_dir/$cluster";
@@ -141,7 +146,7 @@ sub mysqldump {
 	}
 
 	print "<<<< mysqldump $database\n";
-	return;
+	return $rc;
 }
 
 #
