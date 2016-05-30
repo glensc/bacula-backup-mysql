@@ -32,7 +32,7 @@ use File::Path qw(rmtree);
 use constant EX_UNAVAILABLE => 69;
 use constant EX_SOFTWARE => 70;
 
-our $VERSION = '0.7.2';
+our $VERSION = '0.8';
 
 # path to Apache HTTPd-style config
 my $configfile = '/etc/bacula/backup-mysql.conf';
@@ -82,10 +82,10 @@ $exit = EX_UNAVAILABLE unless defined $exit;
 exit($exit);
 
 #
-# Usage: mysqldump $CLUSTER $DATABASE $TABLES $USERNAME $PASSWORD $SOCKET
+# Usage: mysqldump $CLUSTER $DATABASE $TABLES $USERNAME $PASSWORD $HOST $SOCKET
 #
 sub mysqldump {
-	my ($dbh, $cluster, $database, $tables, $user, $password, $socket) = @_;
+	my ($dbh, $cluster, $database, $tables, $user, $password, $host, $socket) = @_;
 
 	my $dstdir = tempdir("bbm.XXXXXX", DIR => $tmpdir);
 
@@ -101,6 +101,7 @@ sub mysqldump {
 	my @shell = ('mysqldump');
 	push(@shell, '-u', $user) if $user;
 	push(@shell, "-p$password") if $password;
+	push(@shell, '-h', $host) if $host;
 	push(@shell, '-S', $socket) if $socket;
 	# use -r option so we don't have to mess with output redirection
 	push(@shell, '-r', "$dstdir/mysqldump.sql");
@@ -247,12 +248,13 @@ sub backup_cluster {
 	# get db connection info
 	my $user = $c->get($cluster, 'user') || $c->get('client', 'user');
 	my $password = $c->get($cluster, 'password') || $c->get('client', 'password');
+	my $host = $c->get($cluster, 'host') || $c->get('client', 'host');
 	my $socket = $c->get($cluster, 'socket') || $c->get('client', 'socket');
 
 	# dump type: mysqlhotcopy, mysqldump
 	my $dump_type = $c->get($cluster, 'dump_type') || 'mysqlhotcopy';
 
-	my $dbh = BBM::DB->new($user, $password, $socket);
+	my $dbh = BBM::DB->new($user, $password, $host, $socket);
 
 	# get databases to backup
 	my @include = $c->get($cluster, 'include_database');
@@ -289,7 +291,7 @@ sub backup_cluster {
 		eval {
 			if ($dump_type eq 'mysqldump') {
 				my ($db, $tables) = BBM::DB::get_backup_tables($dbh, $db);
-				$rc = mysqldump($dbh, $cluster, $db, $tables, $user, $password, $socket);
+				$rc = mysqldump($dbh, $cluster, $db, $tables, $user, $password, $host, $socket);
 
 			} elsif ($dump_type eq 'mysqlhotcopy') {
 				$rc = mysqlhotcopy($dbh, $cluster, $db, $user, $password, $socket);
@@ -316,9 +318,10 @@ use strict;
 
 # DB class for simple Database connection
 sub new {
-	my ($self, $user, $password, $socket) = @_;
+	my ($self, $user, $password, $host, $socket) = @_;
 	my $dsn = '';
-	$dsn .= "mysql_socket=$socket" if $socket;
+	$dsn .= "host=$host;" if $host;
+	$dsn .= "mysql_socket=$socket;" if $socket;
 	my $dbh = DBI->connect("DBI:mysql:$dsn", $user, $password, { PrintError => 0, RaiseError => 1 });
 	return $dbh;
 }

@@ -127,7 +127,7 @@ more than one database.
 
 =head1 AUTHOR
 
-Copyright (C) 2009-2012, Elan RuusamE<auml>e <glen@delfi.ee>
+Copyright (C) 2009-2016, Elan RuusamE<auml>e <glen@delfi.ee>
 
 =head1 SEE ALSO
 
